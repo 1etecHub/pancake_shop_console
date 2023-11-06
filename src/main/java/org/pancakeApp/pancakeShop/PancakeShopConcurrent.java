@@ -3,6 +3,7 @@ package org.pancakeApp.pancakeShop;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
 
 public class PancakeShopConcurrent {
     public static void main(String[] args) {
@@ -16,15 +17,28 @@ public class PancakeShopConcurrent {
     }
 
     public void simulate30SecondsConcurrently() {
-        List<Integer> pancakesMadeList = new ArrayList<>();
-        List<Integer> pancakesEatenList = new ArrayList<>();
+        List<CompletableFuture<Integer>> pancakeMakingFutures = new ArrayList<>();
+        List<CompletableFuture<Integer>> pancakeEatingFutures = new ArrayList<>();
 
-        //using parallel streams to carry out concurrency
-        shopkeepersMakePancakes(pancakesMadeList);
-        usersEatPancakes(pancakesEatenList);
+        for (int i = 0; i < 3; i++) {
+            pancakeMakingFutures.add(CompletableFuture.supplyAsync(() -> shopkeepersMakePancakes()));
+            pancakeEatingFutures.add(CompletableFuture.supplyAsync(() -> usersEatPancakes()));
+        }
 
-        int pancakesMade = pancakesMadeList.stream().mapToInt(Integer::intValue).sum();
-        int pancakesEaten = pancakesEatenList.stream().mapToInt(Integer::intValue).sum();
+        CompletableFuture<Void> allPancakeMaking = CompletableFuture.allOf(pancakeMakingFutures.toArray(new CompletableFuture[0]));
+        CompletableFuture<Void> allPancakeEating = CompletableFuture.allOf(pancakeEatingFutures.toArray(new CompletableFuture[0]));
+
+        allPancakeMaking.join();
+        allPancakeEating.join();
+
+        int pancakesMade = pancakeMakingFutures.stream()
+                .map(CompletableFuture::join)
+                .mapToInt(Integer::intValue)
+                .sum();
+        int pancakesEaten = pancakeEatingFutures.stream()
+                .map(CompletableFuture::join)
+                .mapToInt(Integer::intValue)
+                .sum();
 
         System.out.println("Shopkeeper made " + pancakesMade + " pancakes.");
         System.out.println("Total pancakes eaten by users: " + pancakesEaten);
@@ -37,32 +51,22 @@ public class PancakeShopConcurrent {
         if (pancakesEaten <= pancakesMade) {
             System.out.println("Shopkeeper met the needs of all users.");
         } else {
-            System.out.println("Shopkeeper could not meet all needs.");
+            System.out.
+                    println("Shopkeeper could not meet all needs.");
             int unmetOrders = pancakesEaten - pancakesMade;
             System.out.println("Unmet pancake orders: " + unmetOrders);
         }
     }
 
-    // method to enable shopkepper make pancake
-    private void shopkeepersMakePancakes(List<Integer> pancakesMadeList) {
+    // method to enable shopkeeper make pancake
+    private int shopkeepersMakePancakes() {
         Random random = new Random();
-        pancakesMadeList.add(random.nextInt(13));
+        return random.nextInt(13);
     }
 
     // method to enable user request for pancake
-    private void usersEatPancakes(List<Integer> pancakesEatenList) {
+    private int usersEatPancakes() {
         Random random = new Random();
-        pancakesEatenList.add(random.nextInt(6)); // Up to 5 pancakes
-        pancakesEatenList.add(random.nextInt(6)); // Up to 5 pancakes
-        pancakesEatenList.add(random.nextInt(6)); // Up to 5 pancakes
+        return random.nextInt(6); // Up to 5 pancakes
     }
-
-    /*
-    *OBSERVATION
-    *
-    Both the non-concurrent and concurrent versions are similar in behavior, as there are no actual threads or parallel execution involved in the concurrent version.
-
-    In both versions, I simulated 10 rounds of 30 seconds each.
-
-    The main difference is that the concurrent version may give the impression of running in parallel because it calculates for multiple "30 seconds slots" in a loop. However, there are no actual threads in this implementation. To achieve true parallelism, you would need to use threads or ExecutorService*/
 }
